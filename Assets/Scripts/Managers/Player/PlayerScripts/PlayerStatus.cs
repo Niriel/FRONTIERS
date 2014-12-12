@@ -21,10 +21,23 @@ namespace Frontiers
 				public GameObject NGUIObject { get { return gameObject; } set { return; } }
 
 				public string LatestCauseOfDeath = string.Empty;
+				// NIRIEL.
+				// Should all these temperatures be public?
+				// This class computes them on the fly for its active state list.
+				// I don't think anything else accesses them.
+				// Actually, they could probably be local to the method that
+				// computes them.
 				public TemperatureRange LatestTemperatureRaw;
 				public TemperatureRange LatestTemperatureAdjusted;
 				public TemperatureRange LatestTemperatureExposure;
+				// NIRIEL.
+				// Define intervals that way for all coroutines.
 				public double CheckConditionsInterval = 0.15f;
+				// NIRIEL.
+				// Conditions are in PlayerStatusState, they're being serialized.
+				// Actions and StateList are not serialized.  So their state does
+				// not matter.  They just seem to be some sort of cache mechanism
+				// for something that needs them.
 				public List <AvatarAction> RecentActions = new List <AvatarAction>();
 				public List <string> ActiveStateList = new List <string>();
 				public List <string> CustomStateList = new List <string>();
@@ -34,12 +47,17 @@ namespace Frontiers
 				public bool IsStateActive(string stateName)
 				{	//TODO make this better
 						return ActiveStateList.Contains(stateName);
+					// NIRIEL.
+					// I actually think this is pretty good :).
 				}
 
 				#region initialization
 
 				public override void OnGameLoadFinish()
 				{
+				        // NIRIEL.
+				        // Hashset here, but list somewhere else.  Reason?
+				        // The way I see it, they should all be dictionaries.
 						HashSet <Condition> activeConditions = new HashSet<Condition>();
 
 						mStatusKeeperLookup.Clear();
@@ -74,6 +92,7 @@ namespace Frontiers
 								return;
 
 						////Debug.Log ("PLAYER STATUS: Initialize");
+						
 						Player.Get.AvatarActions.Subscribe(AvatarAction.ItemCraft, new ActionListener(ItemCraft));
 						Player.Get.AvatarActions.Subscribe(AvatarAction.ItemCraft, new ActionListener(ItemCarry));
 
@@ -83,6 +102,8 @@ namespace Frontiers
 						Player.Get.AvatarActions.Subscribe(AvatarAction.NpcConverseStart, new ActionListener(InteractionWithCharacterStart));
 						Player.Get.AvatarActions.Subscribe(AvatarAction.NpcConverseEnd, new ActionListener(InteractionWithCharacterFinish));
 
+                        // NIRIEL.
+                        // What?
 						player.Surroundings.OnExposureDecrease += OnExposureDecrease;
 						player.Surroundings.OnExposureIncrease += OnExposureIncrease;
 						player.Surroundings.OnHeatDecrease += OnHeatDecrease;
@@ -90,6 +111,8 @@ namespace Frontiers
 
 						GUIPlayerStatusInterface.Get.Initialize(StatusKeepers);
 
+                        // NIRIEL.
+                        // Where does this 'enabled' come from?
 						enabled = true;
 				}
 
@@ -98,12 +121,33 @@ namespace Frontiers
 						RecentActions.Clear();
 						State.ActiveConditions.Clear();
 						ResetStatusKeepers();
+						// NIRIEL.
+						// What about ActiveStateList?  Like, you're on fire, or traveling?
+						// Shouldn't they reset as well?  At least some of them?
+						// Also, stop the coroutines?
 				}
 
 				public override void OnLocalPlayerDespawn()
 				{
 						RecentActions.Clear();
 						State.ActiveConditions.Clear();
+						// NIRIEL.
+						// Status keepers?  ActiveStateList?
+						// I don't know when the player despawns.  Maybe it's only when we leave the current game.
+						// Then we return to the start menu (at least we should), or maybe we're loading a new game.
+						// It's nice to clean everything.
+						
+						// NIRIEL.
+						// Stop the coroutines!  The status ones and stuff.
+						//   mCheckingStatusKeepers = False
+						//   mCheckingConditions = False
+						//   mCheckingEnvironment = False
+						//   mCheckingActiveStateList = False
+						// They'll be restarted when the next spawn occur.
+						// Otherwise, they keep running while the avatar doesn't exist.
+						// Unless I misunderstand what it means to be despawned.
+						// Note that setting these flags to False does not guarantee to stop the coroutines on time.
+						// To ensure that, coroutines should yield only at the very end of their while loop.
 				}
 
 				public override bool SaveState(out string playerState)
@@ -125,6 +169,9 @@ namespace Frontiers
 
 				public override void OnLocalPlayerSpawn()
 				{
+				        // NIRIEL.
+				        // Is that also called when we wake up from a bed or stand up from a chair?
+				        // Can it be called before PlayerSurroundings' onSpawn?
 						if (SpawnManager.Get.CurrentStartupPosition != null) {
 								for (int i = 0; i < SpawnManager.Get.CurrentStartupPosition.StatusValues.Count; i++) {
 										StatusKeeper statusKeeper = null;
@@ -141,6 +188,8 @@ namespace Frontiers
 								StartCoroutine(CheckStatusKeepers());
 						}
 						if (!mCheckingConditions) {
+						        // NIRIEL.
+						        // Or mCheckingACTIVEConditions ?
 								mCheckingConditions = true;
 								StartCoroutine(CheckActiveConditions());
 						}
@@ -149,8 +198,13 @@ namespace Frontiers
 								StartCoroutine(CheckEnvironment());
 						}
 
+                        // NIRIEL.
+                        // No if here?
 						StartCoroutine(CheckActiveStateList());
 
+                        // NIRIEL.
+                        // Do coroutines immediately run till their first yield?
+                        // Will the PlayerSurrounding object have finished its OnLocalPlayerSpawn?
 						for (int i = 0; i < State.ActiveConditions.Count; i++) {
 								Condition activeCondition = State.ActiveConditions[i];
 								for (int j = 0; j < StatusKeepers.Count; j++) {
@@ -168,6 +222,8 @@ namespace Frontiers
 
 				public void OnRespawnBedFound(Bed respawnBed)
 				{
+				        // NIRIEL.
+				        // Idea: just put the avatar back where it was when it clicked the bed.
 						player.State.Transform.Position = respawnBed.BedsidePosition;
 						player.Spawn();
 						respawnBed.TryToSleep(WorldClock.Get.TimeOfDayAfter(WorldClock.TimeOfDayCurrent));
@@ -308,6 +364,14 @@ namespace Frontiers
 								if (string.Equals(activeCondition.Name, conditionName) && !activeCondition.HasExpired) {	//double its duration so it'll last twice as long
 										////Debug.Log ("Increasing duration on existing condition " + conditionName);
 										activeCondition.IncreaseDuration(activeCondition.Duration * Globals.StatusKeeperTimecale);
+										
+										// NIRIEL.
+										// I am scared of this Timescale thing here.  Can it change?
+										// Because if it does, then all the durations that are already set may become wrong.
+										// Depends how the remaining time of conditions is managed.
+										// Also, I am confused.  StatusKeeper is a GUI thing?  What does its speed has to do with the inner
+										// workings of the player avatar?  Need to read more.
+										
 										return;
 								}
 						}
@@ -324,7 +388,7 @@ namespace Frontiers
 												statusKeeper.ReceiveCondition(condition);
 										}
 								}
-						}
+						} // NIRIEL.  Else error.  Don't create conditions that do not exist.
 				}
 
 				public void RemoveCondition(string conditionName)
@@ -362,7 +426,7 @@ namespace Frontiers
 						StatusKeeper status = null;
 						if (GetStatusKeeper(type, out status)) {
 								switch (status.Name) {
-										default:
+										default: // NIRIEL.  Shouldn't that be the last case?
 												break;
 
 										case "Health":
@@ -406,11 +470,21 @@ namespace Frontiers
 				{
 						mLastConditionCheckTime = WorldClock.AdjustedRealTime;
 
+                        // NIRIEL.
+                        // I haven't found where mCheckingActiveConditions is set to True.
 						while (mCheckingActiveConditions) {
 
 								while (!GameManager.Is(FGameState.InGame)) {
 										yield return null;
 								}
+								// NIRIEL.
+								// if (!GameManager.Is(FGameState.InGame)) {
+								//		yield return null;
+								//      continue;
+								// }
+								// Is more robust.  Indeed, it guarantees that setting
+								// mCheckingActiveConditions to False will stop the coroutine
+								// immediately.
 
 								for (int i = State.ActiveConditions.Count - 1; i >= 0; i--) {
 										//use the last checked time to get a delta time
@@ -422,12 +496,17 @@ namespace Frontiers
 												    ActiveStateList)) {	//it's toast, remove it
 												State.ActiveConditions.RemoveAt(i);
 										}
+										// NIRIEL.
+										// Remove this.  Make the cleaning atomic.
+										// It's going to make holes in the list of conditions if some are added before we finished cleaning.
+										// The list is short, it's very quick to clean it entirely in one single frame.
+										// Do not yield.
 										yield return null;//TODO check if this is wise?
 								}
 								mLastConditionCheckTime = WorldClock.AdjustedRealTime;
 								yield return new WaitForSeconds((float)CheckConditionsInterval);
 						}
-						mCheckingActiveConditions = false;
+						mCheckingActiveConditions = false;  // NIRIEL.  Remove: remote-controlled.
 						yield break;
 				}
 				//we keep an active state list of strings in addition to our local settings
@@ -446,7 +525,13 @@ namespace Frontiers
 						//5 - InWild			- default state
 						//6 - InDanger			- maybe when there are hostiles around, gives temporary strength boost (?) haven't decided
 
+                        // NIRIEL.  Factor this out, like for conditions?  Seems like it's a semaphore.
 						mCheckingActiveStateList = true;
+						
+                        // NIRIEL.
+                        // Is it garanteed that waiting one frame is enough to be initialized?
+                        // If not, put it in the loop.
+                        // TODO: figure out what initialized means here.
 						while (!mInitialized) {
 								yield return null;
 						}
@@ -456,6 +541,8 @@ namespace Frontiers
 										yield return null;
 								}
 
+						        // NIRIEL.
+						        // Like previously: add a "continue;" statement.
 								if (player.IsDead) {
 										//wait until we're not dead
 										yield return null;
@@ -472,6 +559,8 @@ namespace Frontiers
 								bool traveling = false;
 								bool inDanger = false;
 								bool isWarmedByFire = false;
+								// NIRIEL.
+								// What if cold and warm at the same time?
 
 								traveling = State.IsTraveling;
 								if (!traveling) {	//we can rule a few things out if we're not travling...
@@ -482,6 +571,10 @@ namespace Frontiers
 										isUnderground = player.Surroundings.IsUnderground;
 										sleepingSafely	= sleeping && (inSafeLocation);// || (inCivilization && player.Surroundings.CurrentLocation.State.Type == "Campsite"));//TODO potentially unsafe
 								}
+								// NIRIEL.
+								// Problem:
+								// If traveling, then all the temperature checks will assume that most of these flags are False.
+								// Aren't pathes supposed to be civilized?
 
 								bool checkForFire = false;
 								//check our termperature - the biome will return the correct temperature based on tiem of day / season
@@ -496,6 +589,9 @@ namespace Frontiers
 												//check to see if we're on fire later
 												checkForFire = true;
 										} else {
+										        // NIRIEL.
+										        // Move that out of the if.
+										        // If you are near a fire, then you are warmed up by it, whether you're burning or not.
 												isWarmedByFire = true;
 												//we're not burning but we are warmer than usual
 												//if it's deadly cold or cold bump up the temperature
@@ -507,6 +603,8 @@ namespace Frontiers
 																break;
 
 														default:
+														        // NIRIEL.
+														        // Hot and DeadlyHot.
 																break;
 												}
 										}
@@ -517,11 +615,19 @@ namespace Frontiers
 								//now that we've adjusted for clothing, if we were supposed to check for fire, do it now
 								if (checkForFire && LatestTemperatureExposure == TemperatureRange.E_DeadlyHot) {
 										AddCondition("BurnedByFire");
+										// NIRIEL.
+										// Need a isBurning local variable for isExposedWarm later?
 								}
 
+								// NIRIEL.
+								// Add isBurning to this check :D.
+								// The player carries their own fire with them, which keeps them warm even in the snow,
+								// so that it doesn't say "I'm freezing" when you're on fire.
+                                // Alternative: add the player to the sources of fire while they're on fire.  That way, the temperature calculations are correct
+                                // and there is no need to treat burning players separately.
 								isExposedWarm = ((int)LatestTemperatureExposure) > (int)TemperatureRange.C_Warm;
 								isExposedCold = (!isWarmedByFire && !isExposedWarm) && (((int)LatestTemperatureExposure) < (int)TemperatureRange.C_Warm);
-								inDanger = player.Surroundings.IsInDanger;
+								inDanger = player.Surroundings.IsInDanger; // NIRIEL.  Being on fire should count, I once slept while burning.
 
 								List <string> newStateList = new List <string>();
 
@@ -540,6 +646,8 @@ namespace Frontiers
 								if (traveling) {
 										newStateList.Add("Traveling");
 								}
+								// NIRIEL.
+								// Why add the default state?
 								newStateList.Add("Default");//always add default state (in the wild)
 								if (inDanger) {
 										newStateList.Add("InDanger");
@@ -548,6 +656,9 @@ namespace Frontiers
 										newStateList.Add("InsideStructure");
 								} else {
 										if (isUnderground) {
+										        // NIRIEL.
+										        // What about underground structures?  Modders would love it.
+										        // Burried temples, troglodyte dwellings...
 												newStateList.Add("Underground");
 										} else {
 												newStateList.Add("Outside");
@@ -584,6 +695,8 @@ namespace Frontiers
 										}
 								}
 								//wait a tick
+								// NIRIEL.
+								// Why wait a tick?
 								yield return null;
 								if (applyState) {	////Debug.Log ("Applying state");
 										ActiveStateList.Clear();
@@ -594,15 +707,17 @@ namespace Frontiers
 										}
 										CheckForFlows();
 								}
-								yield return new WaitForSeconds(0.05f);
+								yield return new WaitForSeconds(0.05f); // NIRIEL.  Hardcoded.
 						}
-						mCheckingActiveStateList = false;
+						mCheckingActiveStateList = false;  // NIRIEL.  Remove: remote-controlled.
 						yield break;
 				}
 
 				protected IEnumerator CheckEnvironment()
 				{
 						while (mCheckingEnvironment) {
+						        // NIRIEL.
+						        // TODO: more robust state machine preventing non-sensical states.
 								while (!GameManager.Is(FGameState.InGame)) {
 										yield return null;
 								}
@@ -620,10 +735,10 @@ namespace Frontiers
 										AddCondition("Wet");
 								}
 
-								yield return new WaitForSeconds(1.0f);
+								yield return new WaitForSeconds(1.0f);  // NIRIEL. Hardcoded.
 						}
 						yield break;
-						mCheckingEnvironment = false;
+						mCheckingEnvironment = false;  // NIRIEL.  Remove: remote-controlled.
 				}
 
 				protected IEnumerator CheckStatusKeepers()
@@ -641,9 +756,12 @@ namespace Frontiers
 								}
 
 								double deltaTime = WorldClock.ARTDeltaTime * Globals.StatusKeeperTimecale;
-								for (int i = 0; i < StatusKeepers.Count; i++) {
+								for (int i = 0; i < StatusKeepers.Count; i++) { // NIRIEL.  foreach
 										StatusKeeper statusKeeper = StatusKeepers[i];
 										statusKeeper.UpdateState(deltaTime);
+										// NIRIEL.
+										// Don't Statuskeepers carry their own activeStateList with them?
+										// Why not use their own?  I'm so confused.
 										statusKeeper.ApplyConditions(deltaTime, RecentActions, State.ActiveConditions, ActiveStateList);
 										statusKeeper.ApplyStatusFlows(deltaTime);
 										//are we dead?
@@ -654,9 +772,9 @@ namespace Frontiers
 												}
 										}
 								}
-								yield return null;
+								yield return null; // NIRIEL.  Every frame?  Fine by me.
 						}
-						mCheckingStatusKeepers = false;
+						mCheckingStatusKeepers = false;  // NIRIEL.  Remove: remote-controlled.
 						yield break;
 				}
 
@@ -741,11 +859,11 @@ namespace Frontiers
 				protected bool mCheckingActiveConditions = false;
 				protected bool mCheckingActiveStateList = false;
 				protected bool mCheckingEnvironment = false;
-				protected bool mCheckingFlows = false;
-				protected double mLastConditionCheckTime = 0.15f;
-				protected double mLastStatusKeepersCheckTime = 0.0f;
-				protected double mCheckConditionsTime = 0.0f;
-				protected double mStartSleepTime = 0f;
+				protected bool mCheckingFlows = false;   // NIRIEL.  Unused?
+				protected double mLastConditionCheckTime = 0.15f; // NIRIEL.  Why not 0?
+				protected double mLastStatusKeepersCheckTime = 0.0f; // NIRIEL.  Unused?
+				protected double mCheckConditionsTime = 0.0f; // NIRIEL.  Unused?
+				protected double mStartSleepTime = 0f; // NIRIEL.  Unused?
 				protected Dictionary <string, StatusKeeper> mStatusKeeperLookup = new Dictionary <string, StatusKeeper>();
 		}
 

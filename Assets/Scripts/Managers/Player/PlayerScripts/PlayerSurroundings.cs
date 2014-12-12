@@ -48,6 +48,8 @@ namespace Frontiers
 
 				public override void OnLocalPlayerSpawn()
 				{
+				        // NIRIEL.
+				        // I fear a race condition with PlayerStatus' OnLocalPlayerSpawn.
 						if (StartupStructure != null) {
 								StructureEnter(StartupStructure);
 								StartupStructure = null;
@@ -87,7 +89,9 @@ namespace Frontiers
 				{
 						LeaveAllLocations();
 						State.IsInWater = false;
-						State.GroundBeneathPlayer = GroundType.Dirt;
+						State.GroundBeneathPlayer = GroundType.Dirt; // NIRIEL.  Use illegal value to help debugging.
+						// NIRIEL.
+						// Stop the coroutine?
 				}
 
 				public override void AdjustPlayerMotor(ref float mMotorAccelerationMultiplier, ref float mMotorJumpForceMultiplier, ref float mMotorSlopeAngleMultiplier)

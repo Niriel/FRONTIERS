@@ -205,6 +205,8 @@ namespace Frontiers
 		public void SetValue (float newValue, bool broadcast)
 		{
 			if (!mInitialized) {
+			    // NIRIEL.
+			    // Why do that here?  Why not in the constructor?
 				Initialize ();
 			}
 
@@ -234,9 +236,12 @@ namespace Frontiers
 		public void Initialize ()
 		{
 			if (mInitialized)
-				return;
+				return; // NIRIEL.  Signal error.
+			
 			//clear status flows but keep conditions
 			//status flows are sent every update; conditions are only sent once
+			// NIRIEL.
+			// Call reset here.
 			StatusFlows.Clear ();
 			mActiveState = DefaultState;
 			Value = mActiveState.DefaultValue;
@@ -386,6 +391,8 @@ namespace Frontiers
 
 			foreach (StatusFlow newFlow in newFlows) {
 				if (newFlow != null) {
+				    // NIRIEL.
+				    // Is null a legal value?  If not, do not ignore, raise an error.
 					bool replacedExisting = false;
 					for (int i = StatusFlows.Count - 1; i >= 0; i--) {
 						if (StatusFlows [i] != null && StatusFlows [i] == newFlow) {//replace it outright
@@ -403,8 +410,16 @@ namespace Frontiers
 
 		public void SetState (List <string> states)
 		{
+		    // NIRIEL.
+		    // Called by PlayerStatus.CheckActiveStateList coroutine.
+		    // Each status keeper receives a bunch of states like "isUnderground"
+		    // or "Traveling".
+
 			if (!mInitialized)
+			    // NIRIEL.
+			    // Do not silently ignore orders.  Raise an error.
 				return;
+
 			//go through the states in order and activate them in order
 			//skip any that we don't have
 			StatusKeeperState newActiveState = null;
@@ -420,6 +435,8 @@ namespace Frontiers
 				}
 			}
 			//if we found one
+			// NIRIEL.
+			// What happens to all the other states?
 			if (activatedState) {//set it to the current active state
 				mActiveState.Deactivate ();
 				mActiveState = newActiveState;
@@ -427,12 +444,13 @@ namespace Frontiers
 				GetColors ();
 				RefreshFlows ();
 			}
+			
 		}
 
 		public void ChangeValue (float amount, StatusSeekType changeType)
 		{
 			if (!mInitialized)
-				return;
+				return; // NIRIEL.  Raise error.
 			//automatically applies multipliers
 			SetValue (Value + GetSeekValue (mActiveState.SeekType, changeType, amount), true);
 		}
@@ -440,7 +458,7 @@ namespace Frontiers
 		protected void RefreshFlows ()
 		{
 			if (!mInitialized)
-				return;
+				return; // NIRIEL.  Raise error.
 
 			mActiveState.Overflow.SenderName = Name;
 			mActiveState.Underflow.SenderName = Name;
@@ -483,6 +501,9 @@ namespace Frontiers
 
 		public static float GetSeekValue (StatusSeekType originType, StatusSeekType appliedType, float seekValue)
 		{
+		    // NIRIEL.
+		    // originType is unused.
+		    
 			//TODO implement inverting for mismatched seek types
 			seekValue = Mathf.Abs (seekValue);
 			switch (appliedType) {
@@ -680,6 +701,8 @@ namespace Frontiers
 			}
 		}
 		//used when the player dies
+		// NIRIEL.
+		// Called by removeCondition on the player status.
 		public void Cancel ()
 		{	
 			mExpired = true;

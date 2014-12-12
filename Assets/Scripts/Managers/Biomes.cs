@@ -313,6 +313,8 @@ namespace Frontiers
 				//returns a temperature range adjusted for above ground / below ground, structure and civilization modifiers
 				public TemperatureRange StatusTemperature(Vector3 worldPosition, bool underground, bool insideStructure, bool inCivlization)
 				{
+				        // NIRIEL.
+				        // Make temperature a scalar field.  We can discretize it later.
 						TemperatureRange temp = TemperatureRange.C_Warm;
 						if (insideStructure && inCivlization) {
 								//a civilized structure always has a nice warm temperature
@@ -320,6 +322,14 @@ namespace Frontiers
 						} else if (underground) {
 								//no sun underground therefore no variation
 								//it's always the coldest it can possibly be
+								
+								// NIRIEL.
+								// Strange model.  That would mean that most caves are perpetually frozen.
+								// A better model is to set the temperature of the cave to the average temperature of the biome.
+								// This accounts for the thermal inertia of the thick layer of rock.
+								// Then, remove a few degrees to account for the albedo.
+								// Gameplay bonus: a cave can actually provide shelter in case of super cold weather, which is
+								// why cavemen are called cavemen.
 								temp = GameWorld.Get.CurrentBiome.StatusTempsWinter.StatusTempQuarterNight;
 						} else {
 								//get the normal temp for the area
@@ -339,6 +349,10 @@ namespace Frontiers
 				//this is not modified by civilization or anything 'man-made'
 				public TemperatureRange StatusTemperature(Vector3 worldPosition)
 				{		//TODO incorporate elevation using worldPosition
+				
+				        // NIRIEL.
+				        // Replace all that with two cosine functions.
+				
 						TemperatureRange statusTemp = TemperatureRange.C_Warm;
 						int hourOfDay = WorldClock.Get.HourOfDay;
 						if (UseTimeOfDayOverride) {
